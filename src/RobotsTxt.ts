@@ -151,13 +151,41 @@ export class RobotsTxt {
 	}
 
 	/**
-	 * Parse robots.txt content. Pass the decoded text (or a UTF-8 `Buffer`) you
-	 * fetched; this class performs no I/O.
+	 * Google truncates each robots.txt line at `8 * 2083` bytes before parsing it
+	 * (`kBrowserMaxLineLen * 8` in `robots.cc`). Measured in UTF-8 octets, not
+	 * UTF-16 code units, so we count bytes with the universally-available
+	 * `TextEncoder`. https://github.com/google/robotstxt/blob/master/robots.cc (Parse)
+	 */
+	private static readonly maxLineBytes = 8 * 2083;
+	private static readonly utf8 = new TextEncoder();
+
+	/** Truncate `line` to at most `maxLineBytes` UTF-8 bytes, never splitting a code point. */
+	private static capLineBytes(line: string): string {
+		// Fast path: ASCII-or-shorter strings can't exceed the cap (1 byte/char here).
+		if (line.length <= RobotsTxt.maxLineBytes) {
+			return line;
+		}
+		const bytes = RobotsTxt.utf8.encode(line);
+		if (bytes.length <= RobotsTxt.maxLineBytes) {
+			return line;
+		}
+		// Back off to a code-point boundary: UTF-8 continuation bytes are 0b10xxxxxx.
+		let end = RobotsTxt.maxLineBytes;
+		while (end > 0 && ((bytes[end] ?? 0) & 0xc0) === 0x80) {
+			end--;
+		}
+		return new TextDecoder().decode(bytes.subarray(0, end));
+	}
+
+	/**
+	 * Parse robots.txt content. Pass the decoded text you fetched; this class
+	 * performs no I/O. Each line is capped at Google's per-line byte limit.
 	 */
 	constructor(robotsTxtContent: string) {
 		const osAgnosticNewline = /\s*[\n\r]+\s*/gu;
 
-		for (const line of robotsTxtContent.split(osAgnosticNewline)) {
+		for (const rawLine of robotsTxtContent.split(osAgnosticNewline)) {
+			const line = RobotsTxt.capLineBytes(rawLine);
 			const withoutComments = RobotsTxt.removeLineComments(line);
 			if (withoutComments.length === 0) {
 				continue;
@@ -301,9 +329,18 @@ export class RobotsTxt {
 	 * decide (an empty `Disallow:` does not block), and a specific group that was
 	 * selected but matched nothing still binds the crawler (returns allowed)
 	 * rather than falling through to the `*` group.
+	 *
+	 * `urlOrPath` may be a WHATWG {@link URL} (its path + query are used, and the
+	 * `URL` constructor has already percent-encoded them per RFC 9309) or a raw
+	 * path string. A string is matched byte-for-byte as Google's reference does —
+	 * i.e. you supply it already percent-encoded, exactly the `GetPathParamsQuery`
+	 * contract — so pass a string when you need Googlebot-identical handling of a
+	 * path you encoded yourself, and a `URL` for the convenient, RFC-correct case.
 	 */
-	isCrawlAllowed(url: URL, userAgent: string): boolean {
-		const path = RobotsTxt.canonicalizePath(url.pathname + url.search);
+	isCrawlAllowed(urlOrPath: URL | string, userAgent: string): boolean {
+		const rawPath =
+			typeof urlOrPath === "string" ? urlOrPath : urlOrPath.pathname + urlOrPath.search;
+		const path = RobotsTxt.canonicalizePath(rawPath);
 
 		const specific = this.matchSpecificGroup(userAgent);
 		if (specific) {
@@ -328,8 +365,8 @@ export class RobotsTxt {
 		return true;
 	}
 
-	isCrawlDisallowed(url: URL, userAgent: string): boolean {
-		return !this.isCrawlAllowed(url, userAgent);
+	isCrawlDisallowed(urlOrPath: URL | string, userAgent: string): boolean {
+		return !this.isCrawlAllowed(urlOrPath, userAgent);
 	}
 }
 

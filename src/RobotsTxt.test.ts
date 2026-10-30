@@ -1266,14 +1266,52 @@ suite("RobotsTxt", { timeout: 3_000 }, () => {
 			assert(!allowed(txt, "foobot", "http://foo.com/anyother-url"));
 		});
 
+		test("GoogleOnly_LineTooLong: pattern is cut off at the per-line byte cap", () => {
+			const kMaxLineLen = 2083 * 8;
+			// A disallow pattern comfortably longer than the cap. Everything past
+			// kMaxLineLen bytes of the line (including the "disallow: " key) is
+			// dropped, so the stored pattern ends mid-filler and the "/qux" suffix
+			// never survives.
+			const filler = "a".repeat(kMaxLineLen); // well over the cap on its own
+			const txt = `user-agent: FooBot\ndisallow: /x/${filler}/qux\n`;
+			const robots = new RobotsTxt(txt);
+			const pattern = robots.ruleGroupByUserAgent.get("foobot")?.disallow[0] ?? "";
+
+			// Stored pattern was truncated: shorter than the written value, and the
+			// trailing "/qux" is gone.
+			assert(pattern.length < `/x/${filler}/qux`.length);
+			assert(!pattern.endsWith("/qux"));
+			// It equals the first (kMaxLineLen - "disallow: ".length) bytes of the value.
+			const expected = `/x/${filler}/qux`.slice(0, kMaxLineLen - "disallow: ".length);
+			assert.equal(pattern, expected);
+
+			// The surviving prefix still matches a URL that shares it.
+			assert(robots.isCrawlDisallowed(new URL(`http://foo.bar/x/${filler}`), "FooBot"));
+			// A short line is never touched.
+			const short = new RobotsTxt("user-agent: FooBot\ndisallow: /private\n");
+			assert.equal(short.ruleGroupByUserAgent.get("foobot")?.disallow[0], "/private");
+		});
+
+		test("accepts a pre-encoded path string (Google-exact, no URL normalization)", () => {
+			const txt = "user-agent: *\ndisallow: /foo/bar\n";
+			const robots = new RobotsTxt(txt);
+			// A raw path string is matched byte-for-byte, as Google's reference does.
+			assert(!robots.isCrawlAllowed("/foo/bar", "googlebot"));
+			assert(robots.isCrawlAllowed("/foo/baz", "googlebot"));
+			assert(robots.isCrawlDisallowed("/foo/bar/qux", "googlebot"));
+			// A caller-encoded non-ASCII path matches a rule canonicalized the same way.
+			const enc = new RobotsTxt("user-agent: *\ndisallow: /€\n");
+			assert(!enc.isCrawlAllowed("/%E2%82%AC", "googlebot"));
+		});
+
 		// NOT PORTED (deliberate):
-		//  - GoogleOnly_LineTooLong: Google caps each line at 8*2083 bytes. We cap
-		//    the whole file at 500 KiB (in fetch), not per line, so this is N/A.
 		//  - ID_LinesNumbersAreCountedCorrectly / ID_UTF8ByteOrderMarkIsSkipped:
 		//    exercise Google's per-line parse-callback counters, which we don't
-		//    expose. (Our BOM handling lives in fetch's TextDecoder, not the parser.)
+		//    expose. BOM stripping belongs to the byte decoder the caller runs
+		//    before handing us text, not to this transport-agnostic parser.
 		//  - TestGetPathParamsQuery / TestMaybeEscapePattern: test Google's raw-URL
-		//    parser; callers hand us a WHATWG `URL`, which already strips the
-		//    scheme/authority/fragment and canonicalises the path.
+		//    parser. A WHATWG `URL` already strips scheme/authority/fragment and
+		//    canonicalizes the path; a caller wanting Google's exact raw-path
+		//    handling passes a pre-encoded string to isCrawlAllowed instead.
 	});
 });

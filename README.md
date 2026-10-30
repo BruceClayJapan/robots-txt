@@ -60,14 +60,20 @@ to the `User-agent: *` group when no specific group matches.
 
 Parse robots.txt `content` (already-decoded UTF-8 text).
 
-### `isCrawlAllowed(url: URL, userAgent: string): boolean`
+### `isCrawlAllowed(urlOrPath: URL | string, userAgent: string): boolean`
 
-Whether `userAgent` may crawl `url`. Pass a parsed `URL`; only its path and
-query participate in matching (scheme, host and fragment are ignored, matching
-Google's `GetPathParamsQuery`). The caller is responsible for percent-encoding
-the URL, which the WHATWG `URL` constructor already does.
+Whether `userAgent` may crawl the target. Pass either:
 
-### `isCrawlDisallowed(url: URL, userAgent: string): boolean`
+- a **`URL`** — its path and query are matched (scheme, host and fragment are
+  ignored, matching Google's `GetPathParamsQuery`). The `URL` constructor has
+  already percent-encoded the path per RFC 9309, so this is the convenient,
+  spec-correct path.
+- a **path string** — matched byte-for-byte exactly as Google's reference does
+  (you supply it already percent-encoded, the `GetPathParamsQuery` contract).
+  Use this when you need Googlebot-identical handling of a path you encoded
+  yourself and do not want WHATWG `URL` normalization in the way.
+
+### `isCrawlDisallowed(urlOrPath: URL | string, userAgent: string): boolean`
 
 Inverse of `isCrawlAllowed`.
 
@@ -81,17 +87,22 @@ a user-agent group).
 The parsed groups, keyed by normalized user-agent token (`"*"` for the global
 group). Exposed for inspection; `isCrawlAllowed` is the supported decision path.
 
-## Known divergences from Google's C++ reference
+## Runtime support
 
-- **URL encoding.** Google treats the caller's URL as pre-encoded and does not
-  re-encode raw non-ASCII, whereas the WHATWG `URL` you pass here has already
-  normalized it (e.g. `ツ` → `%E3%83%84`). This is the RFC-9309-correct
-  comparison and only differs for callers who deliberately pass a raw,
-  unencoded path.
-- **Per-line length cap.** Google truncates each line at `8 * 2083` bytes. This
-  library does not cap line length; cap the whole document yourself before
-  parsing if you need Google's exact behavior (Google ignores content past
-  500 KiB).
+Pure, standard JavaScript — no Node built-ins, no `Buffer`, no filesystem, no
+`process`. It uses only `URL`, `TextEncoder`/`TextDecoder`, typed arrays and
+regex, which are present in every modern runtime, so it runs unchanged on
+**Node 18+, Deno, Bun, Cloudflare Workers / other edge runtimes, and browsers**.
+The published package is ESM with bundled `.d.ts`.
+
+## Google-reference fidelity notes
+
+- **Per-line length cap.** Each line is truncated at Google's `8 * 2083` UTF-8
+  bytes before parsing (never splitting a code point), matching `robots.cc`.
+  Cap the whole document yourself if you also need Google's 500 KiB file limit.
+- **URL encoding.** A `URL` argument is compared after WHATWG normalization (the
+  RFC-9309-correct form); pass a pre-encoded path string for byte-exact
+  Googlebot behavior on a path you encoded yourself.
 
 ## License
 
