@@ -1,0 +1,56 @@
+{
+	"name": "@bruce-clay/robots-txt",
+	"version": "1.0.0",
+	"description": "A dependency-free, faithful TypeScript port of Google's reference robots.txt parser and matcher.",
+	"keywords": [
+		"robots.txt",
+		"robots",
+		"crawler",
+		"googlebot",
+		"rfc9309",
+		"web-crawler",
+		"seo"
+	],
+	"license": "Apache-2.0",
+	"author": "Bruce Clay Japan, Inc. (https://bruceclay.jpn.com)",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/bruce-clay/robots-txt.git"
+	},
+	"homepage": "https://github.com/bruce-clay/robots-txt#readme",
+	"bugs": {
+		"url": "https://github.com/bruce-clay/robots-txt/issues"
+	},
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"LICENSE"
+	],
+	"sideEffects": false,
+	"engines": {
+		"node": ">=18"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"typecheck": "tsc --noEmit -p tsconfig.json",
+		"test": "node --test --test-timeout=10000 \"src/**/*.test.ts\"",
+		"clean": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+		"prepublishOnly": "npm test && npm run build"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"devDependencies": {
+		"@types/node": "^26.6.6",
+		"typescript": "^7.0.2"
+	}
+}

@@ -1,0 +1,38 @@
+{
+	"compilerOptions": {
+		"target": "esnext",
+		"lib": ["esnext"],
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+		"noImplicitOverride": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+
+		"skipLibCheck": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"verbatimModuleSyntax": true,
+
+		"outDir": "dist",
+		"rootDir": "src",
+
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+
+		// Sources import siblings as `./RobotsTxt.ts`; rewrite those specifiers to
+		// `.js` on emit so the published package resolves under plain Node/NodeNext.
+		"rewriteRelativeImportExtensions": true,
+		"allowImportingTsExtensions": true,
+
+		"types": ["node"]
+	},
+	"include": ["src/**/*.ts"],
+	"exclude": ["src/**/*.test.ts", "dist"]
+}
