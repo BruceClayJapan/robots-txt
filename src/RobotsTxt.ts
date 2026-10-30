@@ -324,6 +324,22 @@ export class RobotsTxt {
 	}
 
 	/**
+	 * The `allow`/`disallow` rule group that actually governs `userAgent`, resolved
+	 * exactly as {@link RobotsTxt.isCrawlAllowed} resolves it: the most specific
+	 * matching group (longest user-agent-token prefix of the crawler name), else
+	 * the global `*` group, else `undefined` when neither exists. So
+	 * `rulesForUserAgent("Googlebot-Image")` returns the `User-agent: Googlebot`
+	 * group's rules even though it is keyed under `"googlebot"`.
+	 *
+	 * The returned object is the live group (shared with `ruleGroupByUserAgent`);
+	 * treat it as read-only. Use this to inspect which rules apply to a crawler;
+	 * use `isCrawlAllowed` to make a per-URL decision.
+	 */
+	rulesForUserAgent(userAgent: string): RuleGroup | undefined {
+		return this.matchSpecificGroup(userAgent) ?? this.ruleGroupByUserAgent.get("*");
+	}
+
+	/**
 	 * Decide whether `userAgent` may crawl `url`. Faithful port of Google's
 	 * `RobotsMatcher::disallow()`: allow wins ties, only priorities strictly > 0
 	 * decide (an empty `Disallow:` does not block), and a specific group that was

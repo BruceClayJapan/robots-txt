@@ -771,6 +771,28 @@ suite("RobotsTxt", { timeout: 3_000 }, () => {
 		assert(robo.ruleGroupByUserAgent.get("repeated-user-agent"));
 	});
 
+	test("rulesForUserAgent resolves the effective group", () => {
+		const r = new RobotsTxt(
+			"User-agent: Googlebot\nDisallow: /g\n\n" +
+				"User-agent: *\nDisallow: /all\n",
+		);
+		// Prefix match: "Googlebot-Image" resolves to the Googlebot group.
+		assert.deepEqual(r.rulesForUserAgent("Googlebot-Image"), {
+			allow: [],
+			disallow: ["/g"],
+		});
+		// Same group regardless of a version suffix.
+		assert.equal(r.rulesForUserAgent("Googlebot/2.1"), r.rulesForUserAgent("googlebot"));
+		// No specific match falls back to the global "*" group.
+		assert.deepEqual(r.rulesForUserAgent("SomeOtherBot"), {
+			allow: [],
+			disallow: ["/all"],
+		});
+		// Neither specific nor "*" -> undefined.
+		const onlySpecific = new RobotsTxt("User-agent: FooBot\nDisallow: /x\n");
+		assert.equal(onlySpecific.rulesForUserAgent("BarBot"), undefined);
+	});
+
 	const exampleUrl = new URL("http://example.com/");
 
 	test("parses blank rules", () => {

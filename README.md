@@ -77,6 +77,21 @@ Whether `userAgent` may crawl the target. Pass either:
 
 Inverse of `isCrawlAllowed`.
 
+### `rulesForUserAgent(userAgent: string): RuleGroup | undefined`
+
+The `allow`/`disallow` rule group that actually governs `userAgent`, resolved
+the same way `isCrawlAllowed` resolves it: the most specific matching group
+(longest user-agent token that is a prefix of the crawler name), else the global
+`*` group, else `undefined`. So `rulesForUserAgent("Googlebot-Image")` returns
+the `User-agent: Googlebot` group even though it is keyed under `"googlebot"`.
+Use it to inspect which rules apply to a crawler; use `isCrawlAllowed` to make a
+per-URL decision. The returned object is the live group — treat it as read-only.
+
+```ts
+robots.rulesForUserAgent("Googlebot/2.1");
+// => { allow: ["/public"], disallow: ["/private", "/tmp"] }
+```
+
 ### `sitemapHrefs: string[]`
 
 Every `Sitemap:` value found, in file order (sitemaps are global, not scoped to
